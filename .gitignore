@@ -1,0 +1,11 @@
+.vscode
+.pytest_cache
+handoffs
+plans
+yolo_data
+__pycache__
+*.png
+*jpg
+*.mp4
+*.txt
+*.zip

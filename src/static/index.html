@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaf Spring Assembly Verification System</title>
+  <!-- Google Fonts: Orbitron for titles/displays, Outfit for UI text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Reset & CSS variables */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    :root {
+      --bg-gradient: radial-gradient(circle at center, #151c2e 0%, #090c13 100%);
+      --card-bg: rgba(18, 24, 38, 0.7);
+      --card-border: rgba(255, 255, 255, 0.07);
+      --glass-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+      
+      --color-text-main: #e2e8f0;
+      --color-text-muted: #8a99ad;
+      
+      --color-pass: #00ff88;
+      --color-pass-glow: rgba(0, 255, 136, 0.3);
+      --color-fail: #ff3366;
+      --color-fail-glow: rgba(255, 51, 102, 0.3);
+      --color-pending: #ffbb00;
+      --color-pending-glow: rgba(255, 187, 0, 0.3);
+      
+      --color-left: #00ccff;
+      --color-right: #d946ef;
+      
+      --font-display: 'Orbitron', monospace;
+      --font-body: 'Outfit', sans-serif;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--color-text-main);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Layout structure */
+    header {
+      background: rgba(10, 15, 26, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .logo-glow {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-pass);
+      box-shadow: 0 0 12px var(--color-pass);
+      animation: pulse 2s infinite;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      background: linear-gradient(to right, #ffffff, #829ab1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      transition: all 0.3s ease;
+    }
+
+    .connection-status.connected {
+      color: var(--color-pass);
+      border-color: rgba(0, 255, 136, 0.2);
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.05);
+    }
+
+    .connection-status.disconnected {
+      color: var(--color-fail);
+      border-color: rgba(255, 51, 102, 0.2);
+      box-shadow: 0 0 10px rgba(255, 51, 102, 0.05);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    main {
+      flex: 1;
+      padding: 30px;
+      max-width: 1600px;
+      width: 100%;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 30px;
+    }
+
+    @media (max-width: 1100px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards & Containers */
+    .dashboard-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: var(--glass-glow);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      transition: border-color 0.3s ease;
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: var(--color-text-muted);
+      border-left: 3px solid var(--color-left);
+      padding-left: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Live Feed Visualizer */
+    .feed-container {
+      position: relative;
+      background: #06080e;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      width: 100%;
+      aspect-ratio: 576 / 1080;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+
+    .feed-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      z-index: 10;
+    }
+
+    .no-feed-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      color: var(--color-text-muted);
+      z-index: 5;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .radar-scan {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 2px solid rgba(0, 204, 255, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .radar-scan::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 50%, rgba(0, 204, 255, 0.35) 100%);
+      animation: radar 3s linear infinite;
+    }
+
+    .no-feed-text {
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      text-shadow: 0 0 10px rgba(0, 204, 255, 0.1);
+    }
+
+    /* Verification Status Banner */
+    .status-banner {
+      padding: 20px;
+      border-radius: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid transparent;
+      transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    .status-banner.state-pending {
+      background: rgba(255, 187, 0, 0.08);
+      border-color: rgba(255, 187, 0, 0.15);
+      box-shadow: 0 0 25px rgba(255, 187, 0, 0.05);
+    }
+
+    .status-banner.state-pass {
+      background: rgba(0, 255, 136, 0.08);
+      border-color: rgba(0, 255, 136, 0.2);
+      box-shadow: 0 0 25px rgba(0, 255, 136, 0.1);
+    }
+
+    .status-banner.state-fail {
+      background: rgba(255, 51, 102, 0.08);
+      border-color: rgba(255, 51, 102, 0.2);
+      box-shadow: 0 0 25px rgba(255, 51, 102, 0.1);
+    }
+
+    .status-banner.state-waiting {
+      background: rgba(255, 255, 255, 0.02);
+      border-color: var(--card-border);
+      box-shadow: none;
+    }
+
+    .status-label {
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status-value {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-shadow: 0 0 15px currentColor;
+    }
+
+    /* Verification Sub-matches */
+    .matches-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .match-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .match-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 3px;
+      width: 100%;
+      background: var(--color-text-muted);
+      opacity: 0.3;
+    }
+
+    .match-card.state-pass::before {
+      background: var(--color-pass);
+      opacity: 1;
+      box-shadow: 0 0 8px var(--color-pass);
+    }
+
+    .match-card.state-fail::before {
+      background: var(--color-fail);
+      opacity: 1;
+      box-shadow: 0 0 8px var(--color-fail);
+    }
+
+    .match-card.state-pending::before {
+      background: var(--color-pending);
+      opacity: 1;
+      box-shadow: 0 0 8px var(--color-pending);
+    }
+
+    .match-title {
+      font-size: 0.75rem;
+      font-family: var(--font-display);
+      color: var(--color-text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .match-status {
+      font-size: 1.1rem;
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    /* Dynamic Grid Visualization */
+    .chassis-grid {
+      position: relative;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .chassis-outline {
+      position: absolute;
+      top: 15px;
+      bottom: 15px;
+      width: 2px;
+      background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.06) 10%, rgba(255,255,255,0.06) 90%, transparent);
+      z-index: 1;
+    }
+
+    .grid-row {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 440px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .grid-row::after {
+      content: '';
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      top: 50%;
+      height: 1px;
+      background: rgba(255,255,255,0.04);
+      z-index: -1;
+    }
+
+    .slot-node {
+      background: rgba(20, 26, 40, 0.9);
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      width: 180px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slot-node.occupied {
+      border-style: solid;
+      background: rgba(13, 20, 36, 0.95);
+      box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.02);
+    }
+
+    .slot-node.occupied.left-side {
+      border-color: rgba(0, 204, 255, 0.3);
+    }
+
+    .slot-node.occupied.right-side {
+      border-color: rgba(217, 70, 239, 0.3);
+    }
+
+    .slot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .slot-id {
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+    }
+
+    .slot-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #475569;
+    }
+
+    .slot-node.occupied .slot-indicator {
+      background: var(--color-pass);
+      box-shadow: 0 0 8px var(--color-pass);
+    }
+
+    .slot-node.occupied.error .slot-indicator {
+      background: var(--color-fail);
+      box-shadow: 0 0 8px var(--color-fail);
+    }
+
+    .slot-model {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--color-text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .slot-node:not(.occupied) .slot-model {
+      color: rgba(255, 255, 255, 0.15);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 0.85rem;
+    }
+
+    .slot-coords {
+      font-family: monospace;
+      font-size: 0.65rem;
+      color: var(--color-text-muted);
+      opacity: 0.7;
+    }
+
+    /* Queues Visualization */
+    .queues-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .queue-lane {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .queue-lane-label {
+      width: 70px;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .queue-lane-label.left-label {
+      color: var(--color-left);
+      text-shadow: 0 0 8px rgba(0, 204, 255, 0.15);
+    }
+
+    .queue-lane-label.right-label {
+      color: var(--color-right);
+      text-shadow: 0 0 8px rgba(217, 70, 239, 0.15);
+    }
+
+    .queue-items-container {
+      flex: 1;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 4px 0;
+      min-height: 48px;
+    }
+
+    .queue-items-container::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    .queue-items-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+    }
+
+    .queue-item {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+      animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .left-lane .queue-item {
+      border-left: 3px solid var(--color-left);
+    }
+
+    .right-lane .queue-item {
+      border-left: 3px solid var(--color-right);
+    }
+
+    .queue-empty-msg {
+      color: rgba(255,255,255,0.15);
+      font-size: 0.75rem;
+      align-self: center;
+      margin: auto 0;
+      font-style: italic;
+    }
+
+    /* Simulation Control Widgets */
+    .simulator-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 15px;
+    }
+
+    .sim-form-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    select, input, button {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--color-text-main);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a99ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 14px;
+      padding-right: 36px;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--color-left);
+      box-shadow: 0 0 8px rgba(0, 204, 255, 0.15);
+    }
+
+    button {
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    button.btn-primary {
+      background: linear-gradient(135deg, #0077ff 0%, #0055cc 100%);
+      border: none;
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(0, 119, 255, 0.2);
+    }
+
+    button.btn-primary:hover {
+      background: linear-gradient(135deg, #1a85ff 0%, #0066ee 100%);
+      box-shadow: 0 4px 20px rgba(0, 119, 255, 0.35);
+    }
+
+    button.btn-danger {
+      background: linear-gradient(135deg, #ff3366 0%, #cc1144 100%);
+      border: none;
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(255, 51, 102, 0.2);
+    }
+
+    button.btn-danger:hover {
+      background: linear-gradient(135deg, #ff5588 0%, #dd2255 100%);
+      box-shadow: 0 4px 20px rgba(255, 51, 102, 0.35);
+    }
+
+    /* History Table */
+    .history-table-container {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .history-table-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .history-table-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      background: #0f1422;
+      z-index: 5;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    th {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      color: var(--color-text-muted);
+      padding: 12px 16px;
+      text-transform: uppercase;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+      font-family: var(--font-body);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-align: center;
+    }
+
+    .badge.badge-pass {
+      background: rgba(0, 255, 136, 0.1);
+      color: var(--color-pass);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+    }
+
+    .badge.badge-fail {
+      background: rgba(255, 51, 102, 0.1);
+      color: var(--color-fail);
+      border: 1px solid rgba(255, 51, 102, 0.2);
+    }
+
+    .badge.badge-pending {
+      background: rgba(255, 187, 0, 0.1);
+      color: var(--color-pending);
+      border: 1px solid rgba(255, 187, 0, 0.2);
+    }
+
+    .history-models {
+      font-family: monospace;
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+    }
+
+    /* Animations */
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 10px var(--color-pass);
+      }
+      50% {
+        box-shadow: 0 0 25px var(--color-pass);
+      }
+      100% {
+        box-shadow: 0 0 10px var(--color-pass);
+      }
+    }
+
+    @keyframes radar {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes popIn {
+      0% {
+        transform: scale(0.85);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* Decorative Scan lines on Feed */
+    .scanlines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.25) 50%
+      ), linear-gradient(
+        90deg,
+        rgba(255, 0, 0, 0.06),
+        rgba(0, 255, 0, 0.02),
+        rgba(0, 0, 255, 0.06)
+      );
+      background-size: 100% 4px, 6px 100%;
+      z-index: 12;
+      pointer-events: none;
+      opacity: 0.4;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-container">
+      <div class="logo-glow"></div>
+      <h1>LEAF SPRING VERIFICATION SYSTEM</h1>
+    </div>
+    <div id="ws-status" class="connection-status disconnected">
+      <span class="status-dot"></span>
+      <span id="ws-status-text">DISCONNECTED</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Video Feed & Realtime Status -->
+    <div class="dashboard-panel">
+      <div class="panel-title">
+        <span>LIVE CAMERA NORMALIZED WARP STREAM</span>
+      </div>
+      
+      <div class="feed-container">
+        <img id="feed-img" class="feed-img" style="display: none;" alt="Vision Stream" />
+        <div class="scanlines"></div>
+        <div id="no-feed" class="no-feed-placeholder">
+          <div class="radar-scan"></div>
+          <div class="no-feed-text animate-pulse">WAITING FOR VISION SYSTEM FEED...</div>
+        </div>
+      </div>
+
+      <!-- Live status banner -->
+      <div id="status-banner" class="status-banner state-waiting">
+        <div>
+          <span class="status-label">Overall Status</span>
+          <div id="status-desc" style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px;">NO ACTIVE VEHICLE IN STREAM</div>
+        </div>
+        <span id="status-val" class="status-value">—</span>
+      </div>
+
+      <!-- Sub-matches -->
+      <div class="matches-grid">
+        <div id="front-match-card" class="match-card">
+          <div class="match-title">Front-Left = Front-Right</div>
+          <div id="front-match-val" class="match-status" style="color: var(--color-text-muted);">PENDING</div>
+        </div>
+        <div id="rear-match-card" class="match-card">
+          <div class="match-title">Rear-Left = Rear-Right</div>
+          <div id="rear-match-val" class="match-status" style="color: var(--color-text-muted);">PENDING</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Metadata & Controls -->
+    <div style="display: flex; flex-direction: column; gap: 30px;">
+      <!-- Chassis Slot Occupancy Grid -->
+      <div class="dashboard-panel">
+        <div class="panel-title">CHASSIS SLOT GEOMETRY</div>
+        
+        <div class="chassis-grid">
+          <div class="chassis-outline"></div>
+          
+          <!-- Front Slots -->
+          <div class="grid-row">
+            <div id="slot-FL" class="slot-node left-side">
+              <div class="slot-header">
+                <span class="slot-id">FL (Front Left)</span>
+                <span class="slot-indicator"></span>
+              </div>
+              <div class="slot-model">EMPTY</div>
+              <div class="slot-coords" id="coords-FL">COORDS: None</div>
+            </div>
+            
+            <div id="slot-FR" class="slot-node right-side">
+              <div class="slot-header">
+                <span class="slot-id">FR (Front Right)</span>
+                <span class="slot-indicator"></span>
+              </div>
+              <div class="slot-model">EMPTY</div>
+              <div class="slot-coords" id="coords-FR">COORDS: None</div>
+            </div>
+          </div>
+          
+          <!-- Rear Slots -->
+          <div class="grid-row">
+            <div id="slot-RL" class="slot-node left-side">
+              <div class="slot-header">
+                <span class="slot-id">RL (Rear Left)</span>
+                <span class="slot-indicator"></span>
+              </div>
+              <div class="slot-model">EMPTY</div>
+              <div class="slot-coords" id="coords-RL">COORDS: None</div>
+            </div>
+            
+            <div id="slot-RR" class="slot-node right-side">
+              <div class="slot-header">
+                <span class="slot-id">RR (Rear Right)</span>
+                <span class="slot-indicator"></span>
+              </div>
+              <div class="slot-model">EMPTY</div>
+              <div class="slot-coords" id="coords-RR">COORDS: None</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Side Camera Event FIFO Queues -->
+      <div class="dashboard-panel">
+        <div class="panel-title">SIDE CAMERA PICKUP QUEUES</div>
+        
+        <div class="queues-panel">
+          <!-- Left Queue -->
+          <div class="queue-lane left-lane">
+            <div class="queue-lane-label left-label">LEFT SIDE</div>
+            <div id="queue-left" class="queue-items-container">
+              <span class="queue-empty-msg">Queue empty</span>
+            </div>
+          </div>
+          
+          <!-- Right Queue -->
+          <div class="queue-lane right-lane">
+            <div class="queue-lane-label right-label">RIGHT SIDE</div>
+            <div id="queue-right" class="queue-items-container">
+              <span class="queue-empty-msg">Queue empty</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Simulator Controls -->
+      <div class="dashboard-panel">
+        <div class="panel-title">HARDWARE SIMULATOR</div>
+        
+        <div class="simulator-grid">
+          <div class="sim-form-group">
+            <select id="sim-side">
+              <option value="left">LEFT CAMERA</option>
+              <option value="right">RIGHT CAMERA</option>
+            </select>
+            
+            <select id="sim-model">
+              <option value="GREEN_A">GREEN_A</option>
+              <option value="RED_A">RED_A</option>
+              <option value="BLUE_B">BLUE_B</option>
+              <option value="YELLOW_C">YELLOW_C</option>
+              <option value="ORANGE_X">ORANGE_X</option>
+            </select>
+            
+            <button id="btn-trigger" class="btn-primary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              PICKUP EVENT
+            </button>
+            
+            <button id="btn-reset" class="btn-danger" style="background: linear-gradient(135deg, #ff9900 0%, #cc7700 100%); box-shadow: 0 4px 15px rgba(255, 153, 0, 0.2); margin-left: auto;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 11-.57-8.38l5.67-5.67"/></svg>
+              RESET STREAM
+            </button>
+            
+            <button id="btn-clear" class="btn-danger">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              CLEAR QUEUES
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Table -->
+      <div class="dashboard-panel">
+        <div class="panel-title">VERIFICATION HISTORY LOG</div>
+        
+        <div class="history-table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp (IST)</th>
+                <th>FL / FR</th>
+                <th>RL / RR</th>
+                <th>Overall</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody">
+              <tr>
+                <td colspan="4" style="text-align: center; color: var(--color-text-muted); font-style: italic;">No records</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Initialize state
+    const apiBaseUrl = window.location.origin;
+    let ws = null;
+    let reconnectTimeout = null;
+
+    // Dom elements
+    const wsStatusDiv = document.getElementById("ws-status");
+    const wsStatusText = document.getElementById("ws-status-text");
+    const feedImg = document.getElementById("feed-img");
+    const noFeedDiv = document.getElementById("no-feed");
+    
+    const statusBanner = document.getElementById("status-banner");
+    const statusDesc = document.getElementById("status-desc");
+    const statusVal = document.getElementById("status-val");
+    
+    const frontMatchCard = document.getElementById("front-match-card");
+    const frontMatchVal = document.getElementById("front-match-val");
+    const rearMatchCard = document.getElementById("rear-match-card");
+    const rearMatchVal = document.getElementById("rear-match-val");
+    
+    const queueLeftDiv = document.getElementById("queue-left");
+    const queueRightDiv = document.getElementById("queue-right");
+    
+    const btnTrigger = document.getElementById("btn-trigger");
+    const btnClear = document.getElementById("btn-clear");
+    const btnReset = document.getElementById("btn-reset");
+    const simSide = document.getElementById("sim-side");
+    const simModel = document.getElementById("sim-model");
+    
+    const historyTbody = document.getElementById("history-tbody");
+
+    // Queue content hashes for diffing (prevents DOM thrash / popIn re-triggers)
+    let lastQueueLeftKey = "";
+    let lastQueueRightKey = "";
+
+    // Fetch past verification history
+    async function fetchHistory() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/history`);
+        if (response.ok) {
+          const data = await response.json();
+          renderHistory(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch history:", err);
+      }
+    }
+
+    // Render history records
+    function renderHistory(runs) {
+      if (!runs || runs.length === 0) {
+        historyTbody.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align: center; color: var(--color-text-muted); font-style: italic;">No records found</td>
+          </tr>`;
+        return;
+      }
+
+      historyTbody.innerHTML = runs.map(run => {
+        const isPass = run.status === 'PASS';
+        const badgeClass = isPass ? 'badge-pass' : (run.status === 'FAIL' ? 'badge-fail' : 'badge-pending');
+        
+        const fl = run.fl_model || '—';
+        const fr = run.fr_model || '—';
+        const rl = run.rl_model || '—';
+        const rr = run.rr_model || '—';
+        
+        return `
+          <tr>
+            <td>${run.timestamp}</td>
+            <td>
+              <span class="history-models">${fl} / ${fr}</span>
+            </td>
+            <td>
+              <span class="history-models">${rl} / ${rr}</span>
+            </td>
+            <td>
+              <span class="badge ${badgeClass}">${run.status}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Render queue UI helper (with content diffing to prevent DOM thrash)
+    function renderQueue(side, items) {
+      const targetDiv = side === "left" ? queueLeftDiv : queueRightDiv;
+      const contentKey = (items && items.length > 0) ? items.join("|") : "";
+
+      // Skip re-render if content hasn't changed
+      if (side === "left") {
+        if (contentKey === lastQueueLeftKey) return;
+        lastQueueLeftKey = contentKey;
+      } else {
+        if (contentKey === lastQueueRightKey) return;
+        lastQueueRightKey = contentKey;
+      }
+
+      if (!items || items.length === 0) {
+        targetDiv.innerHTML = `<span class="queue-empty-msg">Queue empty</span>`;
+        return;
+      }
+      targetDiv.innerHTML = items.map((item, idx) => `
+        <div class="queue-item">
+          <span style="font-size: 0.6rem; opacity: 0.5;">#${idx + 1}</span>
+          <span>${item}</span>
+        </div>
+      `).join('');
+    }
+
+    // Update chassis slot grid UI
+    function updateChassisGrid(slots, frontMatch, rearMatch) {
+      const slotKeys = ["FL", "FR", "RL", "RR"];
+      slotKeys.forEach(key => {
+        const slotData = slots[key] || { occupied: false, model: null, center: null };
+        const node = document.getElementById(`slot-${key}`);
+        const modelDiv = node.querySelector(".slot-model");
+        const coordsDiv = document.getElementById(`coords-${key}`);
+        
+        if (slotData.occupied) {
+          node.classList.add("occupied");
+          modelDiv.textContent = slotData.model || "UNKNOWN";
+          
+          // Apply matching colors
+          const isFront = key.startsWith("F");
+          const matchResult = isFront ? frontMatch : rearMatch;
+          
+          node.classList.remove("error");
+          if (matchResult === "FAIL" || slotData.model === "UNKNOWN") {
+            node.classList.add("error");
+          }
+        } else {
+          node.classList.remove("occupied");
+          node.classList.remove("error");
+          modelDiv.textContent = "EMPTY";
+        }
+        
+        if (slotData.center) {
+          const [cx, cy] = slotData.center;
+          coordsDiv.textContent = `X: ${cx.toFixed(1)}, Y: ${cy.toFixed(1)}`;
+        } else {
+          coordsDiv.textContent = "COORDS: None";
+        }
+      });
+    }
+
+    // Update Overall Status UI Components
+    function updateStatusUI(active, status, frontMatch, rearMatch) {
+      // Remove previous state classes
+      statusBanner.className = "status-banner";
+      
+      if (!active) {
+        statusBanner.classList.add("state-waiting");
+        statusDesc.textContent = "NO ACTIVE VEHICLE IN STREAM";
+        statusVal.textContent = "WAITING";
+        statusVal.style.color = "var(--color-text-muted)";
+        
+        frontMatchVal.textContent = "PENDING";
+        frontMatchVal.style.color = "var(--color-text-muted)";
+        frontMatchCard.className = "match-card";
+        
+        rearMatchVal.textContent = "PENDING";
+        rearMatchVal.style.color = "var(--color-text-muted)";
+        rearMatchCard.className = "match-card";
+        return;
+      }
+      
+      statusDesc.textContent = "TRACKING VEHICLE IN LANE BOUNDS";
+      statusVal.textContent = status;
+      
+      // Update overall banner
+      if (status === "PASS") {
+        statusBanner.classList.add("state-pass");
+        statusVal.style.color = "var(--color-pass)";
+      } else if (status === "FAIL") {
+        statusBanner.classList.add("state-fail");
+        statusVal.style.color = "var(--color-fail)";
+      } else {
+        statusBanner.classList.add("state-pending");
+        statusVal.style.color = "var(--color-pending)";
+      }
+      
+      // Front match card
+      frontMatchCard.className = "match-card";
+      frontMatchVal.textContent = frontMatch;
+      if (frontMatch === "PASS") {
+        frontMatchCard.classList.add("state-pass");
+        frontMatchVal.style.color = "var(--color-pass)";
+      } else if (frontMatch === "FAIL") {
+        frontMatchCard.classList.add("state-fail");
+        frontMatchVal.style.color = "var(--color-fail)";
+      } else {
+        frontMatchCard.classList.add("state-pending");
+        frontMatchVal.style.color = "var(--color-pending)";
+      }
+      
+      // Rear match card
+      rearMatchCard.className = "match-card";
+      rearMatchVal.textContent = rearMatch;
+      if (rearMatch === "PASS") {
+        rearMatchCard.classList.add("state-pass");
+        rearMatchVal.style.color = "var(--color-pass)";
+      } else if (rearMatch === "FAIL") {
+        rearMatchCard.classList.add("state-fail");
+        rearMatchVal.style.color = "var(--color-fail)";
+      } else {
+        rearMatchCard.classList.add("state-pending");
+        rearMatchVal.style.color = "var(--color-pending)";
+      }
+    }
+
+    // Connect WebSocket Client
+    function connectWS() {
+      if (ws) {
+        ws.close();
+      }
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/client`;
+      
+      console.log(`Connecting to WebSocket: ${wsUrl}...`);
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("WebSocket connected.");
+        wsStatusDiv.className = "connection-status connected";
+        wsStatusText.textContent = "CONNECTED";
+        fetchHistory(); // Refresh history on connection
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          
+          if (payload.type === "queue") {
+            // Received explicit queue update from server DB (single source of truth)
+            renderQueue("left", payload.left);
+            renderQueue("right", payload.right);
+          } else if (payload.state) {
+            // Received active state / stream broadcast
+            const state = payload.state;
+            
+            // NOTE: We intentionally do NOT render queues from state.left_queue/right_queue
+            // here. Those are stale local copies from the tracker process. Queue rendering
+            // is driven solely by {type: "queue"} server DB broadcasts above.
+            
+            // Render chassis node elements
+            updateChassisGrid(state.slots, state.front_match, state.rear_match);
+            
+            // Update banners
+            updateStatusUI(state.active, state.status, state.front_match, state.rear_match);
+            
+            // Handle frame update
+            if (payload.frame) {
+              feedImg.src = payload.frame;
+              feedImg.style.display = "block";
+              noFeedDiv.style.display = "none";
+            }
+            
+            // If vehicle active state transitioned active -> inactive, fetch history
+            // Wait, we can fetch history slightly delayed or directly to see the logged run
+            if (!state.active && feedImg.style.display === "block") {
+              // Refresh history logs list
+              setTimeout(fetchHistory, 500);
+            }
+          }
+        } catch (err) {
+          console.error("Error parsing WS payload:", err);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket closed. Attempting reconnect...");
+        wsStatusDiv.className = "connection-status disconnected";
+        wsStatusText.textContent = "DISCONNECTED";
+        feedImg.style.display = "none";
+        noFeedDiv.style.display = "flex";
+        
+        // Reset slot displays on disconnect
+        updateChassisGrid({}, "PENDING", "PENDING");
+        updateStatusUI(false, "PENDING", "PENDING", "PENDING");
+        
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = setTimeout(connectWS, 3000);
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        ws.close();
+      };
+    }
+
+    // Trigger Simulator Event API Call
+    btnTrigger.onclick = async () => {
+      const side = simSide.value;
+      const model = simModel.value;
+      
+      try {
+        btnTrigger.disabled = true;
+        const response = await fetch(`${apiBaseUrl}/api/event`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ side, model })
+        });
+        
+        if (response.ok) {
+          console.log(`Event triggered successfully: ${side} -> ${model}`);
+        } else {
+          console.error("Failed to trigger simulator event");
+        }
+      } catch (err) {
+        console.error("Simulator API error:", err);
+      } finally {
+        btnTrigger.disabled = false;
+      }
+    };
+
+    // Clear queues API Call
+    btnClear.onclick = async () => {
+      if (!confirm("Are you sure you want to clear left and right queues?")) {
+        return;
+      }
+      try {
+        btnClear.disabled = true;
+        const response = await fetch(`${apiBaseUrl}/api/queue/clear`, {
+          method: "POST"
+        });
+        if (response.ok) {
+          console.log("Queues cleared successfully");
+        } else {
+          console.error("Failed to clear queues");
+        }
+      } catch (err) {
+        console.error("Clear API error:", err);
+      } finally {
+        btnClear.disabled = false;
+      }
+    };
+
+    // Reset stream API Call
+    btnReset.onclick = async () => {
+      if (!confirm("Are you sure you want to reset the video stream and clear all queues?")) {
+        return;
+      }
+      try {
+        btnReset.disabled = true;
+        const response = await fetch(`${apiBaseUrl}/api/tracker/reset`, {
+          method: "POST"
+        });
+        if (response.ok) {
+          console.log("Stream reset request sent successfully");
+        } else {
+          console.error("Failed to send stream reset request");
+        }
+      } catch (err) {
+        console.error("Reset API error:", err);
+      } finally {
+        btnReset.disabled = false;
+      }
+    };
+
+    // Initial setup
+    connectWS();
+    fetchHistory();
+  </script>
+</body>
+</html>
